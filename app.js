@@ -1,19 +1,14 @@
-// ===== INSTAGRAM COMMENT PICKER - AUTO WINNER SELECTOR =====
-// State Management
+// ===== Instagram Comment Picker - Manual Input Version =====
 let appState = {
     comments: [],
     uniqueParticipants: [],
-    winners: [],
-    postInfo: null,
-    isDemoMode: false
+    winners: []
 };
 
-// DOM Elements
 const elements = {
-    instagramUrl: document.getElementById('instagramUrl'),
+    commentsInput: document.getElementById('commentsInput'),
     winnerCount: document.getElementById('winnerCount'),
-    autoPick: document.getElementById('autoPick'),
-    fetchBtn: document.getElementById('fetchBtn'),
+    pickWinnerBtn: document.getElementById('pickWinnerBtn'),
     pickAgainBtn: document.getElementById('pickAgainBtn'),
     exportBtn: document.getElementById('exportBtn'),
     continueBtn: document.getElementById('continueBtn'),
@@ -23,10 +18,12 @@ const elements = {
     loadingSubtext: document.getElementById('loadingSubtext'),
 
     winnerOverlay: document.getElementById('winnerOverlay'),
-    winnerDisplay: document.getElementById('winnerDisplay'),
+    winnerAvatar: document.getElementById('winnerAvatar'),
+    winnerUsernameBig: document.getElementById('winnerUsernameBig'),
+    winnerCommentBig: document.getElementById('winnerCommentBig'),
 
     statsSection: document.getElementById('statsSection'),
-    resultsSection: document.getElementById('resultsSection'),
+    winnersSection: document.getElementById('winnersSection'),
     participantsSection: document.getElementById('participantsSection'),
 
     totalComments: document.getElementById('totalComments'),
@@ -39,7 +36,7 @@ const elements = {
 };
 
 // ===== HELPERS =====
-function showLoading(text = 'Fetching comments...', subtext = 'Please wait') {
+function showLoading(text = 'Processing...', subtext = 'Please wait') {
     elements.loadingText.textContent = text;
     elements.loadingSubtext.textContent = subtext;
     elements.loadingOverlay.classList.add('active');
@@ -47,11 +44,6 @@ function showLoading(text = 'Fetching comments...', subtext = 'Please wait') {
 
 function hideLoading() {
     elements.loadingOverlay.classList.remove('active');
-}
-
-function showError(message) {
-    hideLoading();
-    alert(`❌ Error: ${message}`);
 }
 
 function getSecureRandomInt(max) {
@@ -85,142 +77,77 @@ function animateValue(element, start, end, duration) {
     }, 16);
 }
 
-// ===== FETCH INSTAGRAM COMMENTS =====
-async function fetchInstagramComments(url) {
-    try {
-        showLoading('Fetching Instagram comments...', 'This may take a moment');
-
-        // Call our backend API
-        const response = await fetch('/api/fetch-comments', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ url })
-        });
-
-        if (!response.ok) {
-            throw new Error('Failed to fetch comments from Instagram');
-        }
-
-        const data = await response.json();
-
-        if (!data.success) {
-            throw new Error(data.error || 'Failed to fetch comments');
-        }
-
-        appState.isDemoMode = data.demoMode || false;
-        appState.postInfo = data.postInfo;
-
-        return data.comments;
-
-    } catch (error) {
-        console.error('Fetch error:', error);
-        throw error;
-    }
-}
-
-// ===== PROCESS COMMENTS =====
-function processComments(comments) {
+// ===== PARSE COMMENTS =====
+function parseComments(text) {
+    const lines = text.trim().split('\n').filter(line => line.trim());
+    const parsed = [];
     const userMap = new Map();
-    const processed = [];
 
-    comments.forEach((comment) => {
-        const username = comment.username.toLowerCase().replace('@', '').trim();
+    lines.forEach((line) => {
+        line = line.trim();
+        if (!line) return;
 
-        if (username && !userMap.has(username)) {
-            processed.push({
-                username: comment.username,
-                text: comment.text || '',
-                timestamp: comment.timestamp,
-                id: comment.id
+        let username = '';
+        let comment = '';
+
+        const colonIndex = line.indexOf(':');
+        if (colonIndex > 0 && colonIndex < 50) {
+            username = line.substring(0, colonIndex).trim();
+            comment = line.substring(colonIndex + 1).trim();
+        } else {
+            username = line.trim();
+            comment = '';
+        }
+
+        username = username.replace('@', '').trim();
+        const usernameLower = username.toLowerCase();
+
+        if (username && !userMap.has(usernameLower)) {
+            parsed.push({
+                username: username,
+                text: comment,
+                id: parsed.length
             });
-            userMap.set(username, true);
+            userMap.set(usernameLower, true);
         }
     });
 
     return {
-        unique: processed,
-        total: comments.length,
-        duplicates: comments.length - processed.length
+        parsed: parsed,
+        totalLines: lines.length,
+        uniqueCount: parsed.length,
+        duplicatesCount: lines.length - parsed.length
     };
 }
 
-// ===== UPDATE STATISTICS =====
-function updateStatistics(total, unique, duplicates) {
-    elements.totalComments.textContent = total;
-    elements.uniqueUsers.textContent = unique;
-    elements.duplicatesRemoved.textContent = duplicates;
-    elements.validEntries.textContent = unique;
+// ===== CREATE SPARKLES =====
+function createSparkles() {
+    const sparklesContainer = document.getElementById('sparkles');
+    sparklesContainer.innerHTML = '';
 
-    animateValue(elements.totalComments, 0, total, 800);
-    animateValue(elements.uniqueUsers, 0, unique, 800);
-    animateValue(elements.duplicatesRemoved, 0, duplicates, 800);
-    animateValue(elements.validEntries, 0, unique, 800);
-}
+    const emojis = ['✨', '⭐', '💫', '🌟', '✨', '⭐'];
 
-// ===== DISPLAY PARTICIPANTS =====
-function displayParticipants(participants) {
-    elements.participantsList.innerHTML = '';
-
-    participants.forEach((participant, index) => {
-        const item = document.createElement('div');
-        item.className = 'participant-item';
-        item.innerHTML = `
-            <span class="participant-number">#${index + 1}</span>
-            <span class="participant-username">@${participant.username}</span>
-        `;
-        elements.participantsList.appendChild(item);
-    });
-}
-
-// ===== CONFETTI ANIMATION =====
-function createConfetti() {
-    const confettiContainer = document.getElementById('confetti');
-    confettiContainer.innerHTML = '';
-
-    const colors = ['#FF6B6B', '#4ECDC4', '#FFD700', '#FF4757', '#FFA502', '#C44569'];
-    const shapes = ['circle', 'square'];
-
-    for (let i = 0; i < 100; i++) {
-        const confetti = document.createElement('div');
-        const size = Math.random() * 10 + 5;
-        const color = colors[Math.floor(Math.random() * colors.length)];
-        const shape = shapes[Math.floor(Math.random() * shapes.length)];
-
-        confetti.style.position = 'absolute';
-        confetti.style.width = size + 'px';
-        confetti.style.height = size + 'px';
-        confetti.style.backgroundColor = color;
-        confetti.style.left = Math.random() * 100 + '%';
-        confetti.style.top = -10 + 'px';
-        confetti.style.borderRadius = shape === 'circle' ? '50%' : '0';
-        confetti.style.animation = `confettiFall ${Math.random() * 3 + 2}s linear forwards`;
-        confetti.style.animationDelay = Math.random() * 0.5 + 's';
-
-        confettiContainer.appendChild(confetti);
-    }
-
-    // Add CSS animation for confetti
-    if (!document.getElementById('confetti-style')) {
-        const style = document.createElement('style');
-        style.id = 'confetti-style';
-        style.textContent = `
-            @keyframes confettiFall {
-                to {
-                    transform: translateY(100vh) rotate(${Math.random() * 720}deg);
-                    opacity: 0;
-                }
-            }
-        `;
-        document.head.appendChild(style);
+    for (let i = 0; i < 50; i++) {
+        const sparkle = document.createElement('div');
+        sparkle.className = 'sparkle';
+        sparkle.textContent = emojis[Math.floor(Math.random() * emojis.length)];
+        sparkle.style.left = Math.random() * 100 + '%';
+        sparkle.style.top = Math.random() * 100 + '%';
+        sparkle.style.animationDelay = Math.random() * 2 + 's';
+        sparkle.style.animationDuration = (Math.random() * 2 + 1) + 's';
+        sparklesContainer.appendChild(sparkle);
     }
 }
 
 // ===== SHOW WINNER REVEAL =====
 function showWinnerReveal(winner) {
-    createConfetti();
-    elements.winnerDisplay.textContent = `@${winner.username}`;
+    createSparkles();
+
+    const initial = winner.username.charAt(0).toUpperCase();
+    elements.winnerAvatar.innerHTML = `<span class="avatar-initial">${initial}</span>`;
+    elements.winnerUsernameBig.textContent = `@${winner.username}`;
+    elements.winnerCommentBig.textContent = winner.text ? `"${winner.text}"` : '(No comment text)';
+
     elements.winnerOverlay.classList.add('active');
 }
 
@@ -233,58 +160,67 @@ function pickWinners(participants, count) {
     if (count > participants.length) {
         count = participants.length;
     }
-
     const shuffled = shuffleArray(participants);
     return shuffled.slice(0, count);
 }
 
-// ===== DISPLAY WINNER RESULTS =====
-function displayWinnerResults(winners) {
+//===== DISPLAY WINNERS =====
+function displayWinners(winners) {
     elements.winnersList.innerHTML = '';
 
-    const badges = ['🥇', '🥈', '🥉', '🏆', '⭐', '🎯', '🎊', '🎁', '💎', '👑'];
-    const ranks = ['1st Place', '2nd Place', '3rd Place', '4th Place', '5th Place'];
+    const ranks = ['🥇', '🥈', '🥉', '🏆', '⭐'];
 
     winners.forEach((winner, index) => {
-        const card = document.createElement('div');
-        card.className = 'winner-card';
-        card.style.animationDelay = `${index * 0.1}s`;
+        const item = document.createElement('div');
+        item.className = 'winner-item';
+        item.style.animationDelay = `${index * 0.1}s`;
 
-        const badge = badges[index] || '🌟';
-        const rank = ranks[index] || `Winner #${index + 1}`;
+        const rank = ranks[index] || '🌟';
 
-        card.innerHTML = `
-            <div class="winner-badge">${badge}</div>
-            <div class="winner-info">
-                <div class="winner-rank">${rank}</div>
-                <div class="winner-username">@${winner.username}</div>
-                ${winner.text ? `<div class="winner-comment">"${winner.text}"</div>` : ''}
+        item.innerHTML = `
+            <div class="winner-rank">${rank}</div>
+            <div class="winner-details">
+                <h4>@${winner.username}</h4>
+                <p>${winner.text || '(No comment text)'}</p>
             </div>
         `;
-
-        elements.winnersList.appendChild(card);
+        elements.winnersList.appendChild(item);
     });
+}
+
+// ===== DISPLAY PARTICIPANTS =====
+function displayParticipants(participants) {
+    elements.participantsList.innerHTML = '';
+
+    participants.forEach((participant, index) => {
+        const item = document.createElement('div');
+        item.className = 'participant-item';
+        item.innerHTML = `<span class="participant-username">@${participant.username}</span>`;
+        elements.participantsList.appendChild(item);
+    });
+}
+
+// ===== UPDATE STATS =====
+function updateStatistics(total, unique, duplicates) {
+    animateValue(elements.totalComments, 0, total, 800);
+    animateValue(elements.uniqueUsers, 0, unique, 800);
+    animateValue(elements.duplicatesRemoved, 0, duplicates, 800);
+    animateValue(elements.validEntries, 0, unique, 800);
 }
 
 // ===== EXPORT RESULTS =====
 function exportResults() {
     if (appState.winners.length === 0) {
-        alert('No winners to export yet!');
+        alert('No winners selected yet!');
         return;
     }
 
     const timestamp = new Date().toISOString().split('T')[0];
     let text = `Instagram Comment Picker Results\n`;
     text += `Date: ${timestamp}\n`;
-    text += `Post: ${appState.postInfo?.shortcode || 'N/A'}\n`;
     text += `Total Comments: ${appState.comments.length}\n`;
     text += `Unique Participants: ${appState.uniqueParticipants.length}\n`;
     text += `Duplicates Removed: ${appState.comments.length - appState.uniqueParticipants.length}\n`;
-
-    if (appState.isDemoMode) {
-        text += `\n⚠️ DEMO MODE - Using test data\n`;
-    }
-
     text += `\n${'='.repeat(50)}\n\n`;
     text += `WINNERS:\n\n`;
 
@@ -315,89 +251,63 @@ function exportResults() {
 }
 
 // ===== MAIN FLOW =====
-async function handleFetchAndPick() {
-    const url = elements.instagramUrl.value.trim();
+async function handlePickWinner() {
+    const text = elements.commentsInput.value.trim();
 
-    if (!url) {
-        showError('Please enter an Instagram post URL');
-        return;
-    }
-
-    // Validate URL format
-    if (!url.includes('instagram.com')) {
-        showError('Please enter a valid Instagram URL');
+    if (!text) {
+        alert('�� Please paste some comments first!');
         return;
     }
 
     try {
-        // Fetch comments
-        const comments = await fetchInstagramComments(url);
+        showLoading('Analyzing comments...', 'Removing duplicates');
+        await new Promise(resolve => setTimeout(resolve, 800));
 
-        if (!comments || comments.length === 0) {
+        const result = parseComments(text);
+
+        if (result.uniqueCount === 0) {
             hideLoading();
-            showError('No comments found on this post');
+            alert('❌ No valid comments found. Please check the format!');
             return;
         }
 
-        appState.comments = comments;
+        appState.comments = text.split('\n');
+        appState.uniqueParticipants = result.parsed;
 
-        // Process comments
-        showLoading('Processing comments...', 'Removing duplicates');
-        await new Promise(resolve => setTimeout(resolve, 500)); // Brief pause for UX
-
-        const processed = processComments(comments);
-        appState.uniqueParticipants = processed.unique;
-
-        if (processed.unique.length === 0) {
-            hideLoading();
-            showError('No valid participants found');
-            return;
-        }
-
-        // Update UI
-        updateStatistics(processed.total, processed.unique.length, processed.duplicates);
-        displayParticipants(processed.unique);
+        // Update stats
+        updateStatistics(result.totalLines, result.uniqueCount, result.duplicatesCount);
+        displayParticipants(result.parsed);
 
         elements.statsSection.style.display = 'block';
         elements.participantsSection.style.display = 'block';
 
-        // Auto-pick if enabled
-        if (elements.autoPick.checked) {
-            showLoading('Selecting winner...', '🎲 Rolling the dice...');
-            await new Promise(resolve => setTimeout(resolve, 1500)); // Dramatic pause
+        // Pick winner
+        showLoading('Selecting winner...', '🎲 Randomizing selection...');
+        await new Promise(resolve => setTimeout(resolve, 1500));
 
-            const count = parseInt(elements.winnerCount.value);
-            const winners = pickWinners(processed.unique, count);
-            appState.winners = winners;
+        const count = parseInt(elements.winnerCount.value);
+        const winners = pickWinners(result.parsed, count);
+        appState.winners = winners;
 
-            hideLoading();
+        hideLoading();
 
-            // Show dramatic reveal
-            showWinnerReveal(winners[0]);
+        // Show reveal
+        showWinnerReveal(winners[0]);
 
-            // Display detailed results
-            displayWinnerResults(winners);
-            elements.resultsSection.style.display = 'block';
-
-        } else {
-            hideLoading();
-            alert(`✅ Found ${processed.unique.length} unique participants! Scroll down to pick winners.`);
-        }
-
-        // Scroll to results
-        setTimeout(() => {
-            elements.statsSection.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-        }, 300);
+        // Display all winners
+        displayWinners(winners);
+        elements.winnersSection.style.display = 'block';
 
     } catch (error) {
+        hideLoading();
         console.error('Error:', error);
-        showError(error.message || 'Failed to fetch comments. Please try again.');
+        alert('❌ An error occurred. Please try again!');
     }
 }
 
 function handlePickAgain() {
     if (appState.uniqueParticipants.length === 0) {
-        alert('No participants available');
+        alert('No participants available!');
         return;
     }
 
@@ -405,40 +315,26 @@ function handlePickAgain() {
     const winners = pickWinners(appState.uniqueParticipants, count);
     appState.winners = winners;
 
-    // Show reveal for first winner
     showWinnerReveal(winners[0]);
-
-    // Update results
-    displayWinnerResults(winners);
+    displayWinners(winners);
 }
 
 // ===== EVENT LISTENERS =====
-elements.fetchBtn.addEventListener('click', handleFetchAndPick);
-
+elements.pickWinnerBtn.addEventListener('click', handlePickWinner);
 elements.pickAgainBtn.addEventListener('click', handlePickAgain);
-
 elements.exportBtn.addEventListener('click', exportResults);
-
 elements.continueBtn.addEventListener('click', () => {
     hideWinnerReveal();
-    elements.resultsSection.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    elements.winnersSection.scrollIntoView({ behavior: 'smooth' });
 });
 
-// Enter key support
-elements.instagramUrl.addEventListener('keypress', (e) => {
-    if (e.key === 'Enter') {
-        handleFetchAndPick();
+elements.commentsInput.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter' && e.ctrlKey) {
+        handlePickWinner();
     }
 });
 
 // ===== INITIALIZATION =====
-console.log('🎉 Instagram Comment Picker Loaded!');
-console.log('📊 Auto-Fetch & Pick: READY');
-console.log('🛡️ Anti-Cheat Protection: ENABLED');
-console.log('🔒 Cryptographically Secure Random: ENABLED');
-
-// Show demo if in development
-if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-    console.log('🔧 DEV MODE: You can test with any Instagram URL');
-    console.log('💡 API will use demo data if Instagram blocks requests');
-}
+console.log('✨ Instagram Comment Picker Ready!');
+console.log('🛡️ Anti-Cheat: ON');
+console.log('🎲 Cryptographic Random: ON');

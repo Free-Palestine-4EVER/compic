@@ -4,127 +4,117 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Instagram Comment Picker - Auto Winner Selector</title>
-    <meta name="description"
-        content="Paste Instagram URL and BOOM - instantly pick a fair winner with anti-cheat protection">
+    <title>Instagram Comment Picker - Professional Winner Selector</title>
+    <meta name="description" content="Professional Instagram comment picker with duplicate protection">
     <link rel="stylesheet" href="style.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap"
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap"
         rel="stylesheet">
 </head>
 
 <body>
-    <div class="background-gradient"></div>
-
-    <!-- Loading Overlay -->
-    <div class="loading-overlay" id="loadingOverlay">
-        <div class="loading-content">
-            <div class="spinner"></div>
-            <h2 id="loadingText">Fetching comments...</h2>
-            <p id="loadingSubtext">Please wait while we gather all participants</p>
+    <!-- Winner Reveal Overlay -->
+    <div class="winner-overlay" id="winnerOverlay">
+        <div class="sparkles" id="sparkles"></div>
+        <div class="winner-reveal">
+            <div class="trophy-icon">🏆</div>
+            <h1 class="winner-title">Congratulations!</h1>
+            <div class="winner-card-big" id="winnerCardBig">
+                <div class="winner-avatar" id="winnerAvatar">
+                    <span class="avatar-initial">U</span>
+                </div>
+                <div class="winner-info-big">
+                    <div class="winner-label">THE WINNER IS</div>
+                    <div class="winner-username-big" id="winnerUsernameBig">@username</div>
+                    <div class="winner-comment-big" id="winnerCommentBig">"Amazing post!"</div>
+                </div>
+            </div>
+            <button class="btn btn-continue" id="continueBtn">View All Results</button>
         </div>
     </div>
 
-    <!-- Winner Reveal Overlay -->
-    <div class="winner-overlay" id="winnerOverlay">
-        <div class="winner-reveal">
-            <div class="confetti" id="confetti"></div>
-            <div class="boom-text">💥 BOOM! 💥</div>
-            <h1 class="winner-announcement">THE WINNER IS...</h1>
-            <div class="winner-display" id="winnerDisplay"></div>
-            <button class="btn btn-continue" id="continueBtn">View Details</button>
-        </div>
+    <!-- Loading Overlay -->
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="loading-spinner"></div>
+        <h2 id="loadingText">Processing...</h2>
+        <p id="loadingSubtext">Please wait</p>
     </div>
 
     <div class="container">
         <!-- Header -->
         <header class="header">
             <div class="logo">
-                <svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <rect width="40" height="40" rx="12" fill="url(#gradient)" />
+                <svg width="48" height="48" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <rect width="48" height="48" rx="12" fill="url(#logoGradient)" />
                     <path
-                        d="M20 12C15.58 12 12 15.58 12 20C12 24.42 15.58 28 20 28C24.42 28 28 24.42 28 20C28 15.58 24.42 12 20 12ZM20 25C17.24 25 15 22.76 15 20C15 17.24 17.24 15 20 15C22.76 15 25 17.24 25 20C25 22.76 22.76 25 20 25Z"
+                        d="M24 14C18.48 14 14 18.48 14 24C14 29.52 18.48 34 24 34C29.52 34 34 29.52 34 24C34 18.48 29.52 14 24 14ZM24 30C20.14 30 17 26.86 17 24C17 21.14 20.14 18 24 18C27.86 18 31 21.14 31 24C31 26.86 27.86 30 24 30Z"
                         fill="white" />
-                    <circle cx="25.5" cy="14.5" r="1.5" fill="white" />
+                    <circle cx="30" cy="18" r="2" fill="white" />
                     <defs>
-                        <linearGradient id="gradient" x1="0" y1="0" x2="40" y2="40">
-                            <stop offset="0%" stop-color="#FF6B6B" />
-                            <stop offset="100%" stop-color="#C44569" />
+                        <linearGradient id="logoGradient" x1="0" y1="0" x2="48" y2="48">
+                            <stop offset="0%" stop-color="#E1306C" />
+                            <stop offset="50%" stop-color="#F77737" />
+                            <stop offset="100%" stop-color="#FCAF45" />
                         </linearGradient>
                     </defs>
                 </svg>
-                <h1>IG Comment Picker</h1>
+                <div>
+                    <h1>IG Comment Picker</h1>
+                    <p class="header-subtitle">Fair & Random Winner Selection</p>
+                </div>
             </div>
             <div class="badge">
                 <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
                     <path
                         d="M8 1L10.163 5.38L15 6.12L11.5 9.54L12.326 14.36L8 12.09L3.674 14.36L4.5 9.54L1 6.12L5.837 5.38L8 1Z"
-                        fill="#FFD700" stroke="#FFB800" stroke-width="1.5" />
+                        fill="#FFD700" stroke="#FFA000" stroke-width="1.5" />
                 </svg>
-                Anti-Cheat Enabled
+                Anti-Cheat
             </div>
         </header>
 
         <!-- Main Content -->
         <div class="main-content">
-            <!-- URL Input Section -->
-            <section class="hero-section">
-                <div class="hero-content">
-                    <h2 class="hero-title">🎯 Instant Winner Picker</h2>
-                    <p class="hero-subtitle">Paste your Instagram post URL and watch the magic happen!</p>
+            <!-- Input Section -->
+            <section class="input-section">
+                <h2>📝 Paste Instagram Comments</h2>
+                <p class="section-desc">Copy comments from your Instagram post and paste them below</p>
 
-                    <div class="url-input-container">
-                        <input type="text" id="instagramUrl" class="url-input"
-                            placeholder="https://www.instagram.com/p/ABC123xyz/" autocomplete="off">
-                        <button id="fetchBtn" class="btn btn-fetch">
-                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-                                <path d="M13 10V3L4 14h7v7l9-11h-7z" fill="currentColor" />
-                            </svg>
-                            Fetch & Pick Winner
-                        </button>
-                    </div>
+                <div class="how-to-card">
+                    <strong>📱 How to get comments:</strong>
+                    <ol>
+                        <li>Open your Instagram post in a browser or app</li>
+                        <li>Copy each comment (username + text)</li>
+                        <li>Paste below - one comment per line</li>
+                    </ol>
+                </div>
 
-                    <div class="settings-row">
-                        <div class="setting-item">
-                            <label for="winnerCount">Winners:</label>
-                            <input type="number" id="winnerCount" value="1" min="1" max="10">
-                        </div>
-                        <div class="setting-item">
-                            <label class="checkbox-label">
-                                <input type="checkbox" id="autoPick" checked>
-                                <span>Auto-pick winner</span>
-                            </label>
-                        </div>
-                    </div>
+                <textarea id="commentsInput" placeholder="Paste comments here (one per line):
 
-                    <div class="info-cards">
-                        <div class="info-card">
-                            <div class="info-icon">🛡️</div>
-                            <div class="info-text">
-                                <strong>Duplicate Protection</strong>
-                                <span>One entry per user</span>
-                            </div>
-                        </div>
-                        <div class="info-card">
-                            <div class="info-icon">🎲</div>
-                            <div class="info-text">
-                                <strong>Random Selection</strong>
-                                <span>Cryptographically secure</span>
-                            </div>
-                        </div>
-                        <div class="info-card">
-                            <div class="info-icon">⚡</div>
-                            <div class="info-text">
-                                <strong>Instant Results</strong>
-                                <span>No waiting around</span>
-                            </div>
-                        </div>
+john_doe: This is amazing! 🎉
+jane_smith: I love this! ❤️
+mike_jones: Count me in!
+
+Format: username: comment
+OR just: username" rows="14"></textarea>
+
+                <div class="controls-row">
+                    <div class="winner-count-control">
+                        <label>Number of Winners:</label>
+                        <input type="number" id="winnerCount" value="1" min="1" max="10">
                     </div>
+                    <button id="pickWinnerBtn" class="btn btn-primary">
+                        <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                            <path d="M10 2L12.5 7.5L18 8.5L14 12.5L15 18L10 15.5L5 18L6 12.5L2 8.5L7.5 7.5L10 2Z"
+                                fill="currentColor" />
+                        </svg>
+                        Pick Winner
+                    </button>
                 </div>
             </section>
 
-            <!-- Stats Section (Hidden Initially) -->
+            <!-- Stats Section -->
             <section class="stats-section" id="statsSection" style="display: none;">
                 <h3>📊 Selection Statistics</h3>
                 <div class="stats-grid">
@@ -151,9 +141,9 @@
                 </div>
             </section>
 
-            <!-- Winner Results Section -->
-            <section class="results-section" id="resultsSection" style="display: none;">
-                <h3>🏆 Winner Details</h3>
+            <!-- Winners Section -->
+            <section class="winners-section" id="winnersSection" style="display: none;">
+                <h3>🎉 Selected Winner(s)</h3>
                 <div id="winnersList" class="winners-list"></div>
 
                 <div class="action-buttons">
@@ -181,18 +171,16 @@
 
             <!-- All Participants -->
             <section class="participants-section" id="participantsSection" style="display: none;">
-                <div class="section-header">
-                    <h3>All Valid Participants</h3>
-                    <p class="subtitle">Duplicates automatically removed</p>
-                </div>
+                <h3>All Valid Participants</h3>
+                <p class="section-desc">Duplicates from the same user have been automatically removed</p>
                 <div id="participantsList" class="participants-list"></div>
             </section>
         </div>
 
         <!-- Footer -->
         <footer class="footer">
-            <p>⚡ Instant Fair Winner Selection • 🛡️ Anti-Cheat Protection • 🎲 Cryptographically Secure</p>
-            <p class="footer-note">Paste any Instagram post or reel URL to get started</p>
+            <p>✨ Fair & Transparent • 🛡️ Anti-Cheat Protection • 🎲 Cryptographically Secure Random Selection</p>
+            <p class="footer-note">Each user can only win once • Duplicate comments are automatically removed</p>
         </footer>
     </div>
 
