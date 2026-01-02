@@ -1,4 +1,4 @@
-// Instagram Comment Fetcher - Using Correct Apify Actor
+// Instagram Comment Fetcher - Correct Apify API Endpoint
 export default async function handler(req, res) {
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
@@ -23,29 +23,29 @@ export default async function handler(req, res) {
 
         if (!apifyToken) {
             return res.status(500).json({
-                error: 'APIFY_API_TOKEN not set',
-                message: 'Please add APIFY_API_TOKEN to your Vercel environment variables'
+                error: 'APIFY_API_TOKEN not set'
             });
         }
 
         console.log('Fetching comments for URL:', url);
 
-        // Use the correct Apify Instagram Scraper actor
-        // This is the official Apify actor that works
-        const apifyUrl = 'https://api.apify.com/v2/acts/apify/instagram-scraper/run-sync-get-dataset-items';
+        // Correct Apify API endpoint - run actor and wait for results
+        const actorId = 'apify/instagram-scraper';
+        const apifyUrl = `https://api.apify.com/v2/acts/${actorId}/run-sync-get-dataset-items?token=${apifyToken}`;
 
-        const response = await fetch(`${apifyUrl}?token=${apifyToken}&timeout=180`, {
+        console.log('Calling Apify endpoint:', apifyUrl.replace(apifyToken, '***'));
+
+        const response = await fetch(apifyUrl, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({
                 directUrls: [url],
-                resultsType: 'comments',  // Important: get comments only
-                resultsLimit: 10000,
-                searchType: 'hashtag',
-                searchLimit: 1
-            })
+                resultsType: 'comments',
+                resultsLimit: 10000
+            }),
+            timeout: 300000 // 5 minute timeout
         });
 
         console.log('Apify response status:', response.status);
@@ -56,29 +56,28 @@ export default async function handler(req, res) {
 
             return res.status(500).json({
                 success: false,
-                error: `Apify error: ${response.status}`,
-                details: errorText.substring(0, 300),
-                message: 'Failed to fetch comments. Please check the Instagram URL or try again.'
+                error: `Apify returned ${response.status}`,
+                details: errorText.substring(0, 500),
+                message: 'Failed to fetch comments from Instagram'
             });
         }
 
         const data = await response.json();
-        console.log('Apify returned', data.length, 'items');
+        console.log('Apify returned data, length:', Array.isArray(data) ? data.length : 'not an array');
 
-        // Parse comments from Apify response
+        // Parse comments
         const comments = [];
 
         if (Array.isArray(data)) {
             data.forEach((item, index) => {
-                // Apify returns different structures, handle both
-                const username = item.ownerUsername || item.owner?.username || `user_${index}`;
-                const text = item.text || item.comment || '';
+                const username = item.ownerUsername || item.username || `user_${index}`;
+                const text = item.text || '';
 
-                if (username) {
+                if (username && username !== 'user_' + index) {
                     comments.push({
                         username: username,
                         text: text,
-                        timestamp: item.timestamp || item.created_time || Date.now(),
+                        timestamp: item.timestamp || Date.now(),
                         id: item.id || index.toString()
                     });
                 }
@@ -100,7 +99,7 @@ export default async function handler(req, res) {
         return res.status(500).json({
             success: false,
             error: error.message,
-            message: 'An error occurred while fetching comments. Please try again.'
+            message: 'Failed to fetch comments. Please try again.'
         });
     }
 }
