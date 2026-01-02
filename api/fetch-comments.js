@@ -32,7 +32,7 @@ export default async function handler(req, res) {
 
         // Use the correct Apify Instagram Scraper actor
         // This is the official Apify actor that works
-        const apifyUrl = 'https://api.apify.com/v2/acts/apify~instagram-scraper/run-sync-get-dataset-items';
+        const apifyUrl = 'https://api.apify.com/v2/acts/apify/instagram-scraper/run-sync-get-dataset-items';
 
         const response = await fetch(`${apifyUrl}?token=${apifyToken}&timeout=180`, {
             method: 'POST',
