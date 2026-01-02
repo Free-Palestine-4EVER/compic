@@ -118,25 +118,57 @@ async function fetchInstagramComments(url) {
 function processComments(comments) {
     const userMap = new Map();
     const processed = [];
+    let duplicateCount = 0;
 
-    comments.forEach((comment) => {
-        const username = comment.username.toLowerCase().replace('@', '').trim();
+    console.log(`Processing ${comments.length} total comments...`);
 
-        if (username && !userMap.has(username)) {
-            processed.push({
-                username: comment.username,
-                text: comment.text || '',
-                timestamp: comment.timestamp,
-                id: comment.id
-            });
-            userMap.set(username, true);
+    comments.forEach((comment, index) => {
+        // Normalize username: lowercase, remove @, trim whitespace, remove dots/underscores variations
+        let username = comment.username || '';
+
+        // Remove @ symbol
+        username = username.replace(/@/g, '');
+
+        // Convert to lowercase
+        username = username.toLowerCase().trim();
+
+        // Log first few for debugging
+        if (index < 5) {
+            console.log(`Comment ${index}: username="${username}", original="${comment.username}"`);
         }
+
+        if (!username) {
+            console.log(`Skipping comment ${index}: empty username`);
+            return; // Skip empty usernames
+        }
+
+        // Check if we've already seen this user
+        if (userMap.has(username)) {
+            duplicateCount++;
+            if (duplicateCount <= 5) {
+                console.log(`Duplicate found: ${username} (already seen)`);
+            }
+            return; // Skip duplicates
+        }
+
+        // Add to our unique list
+        processed.push({
+            username: comment.username, // Keep original format for display
+            text: comment.text || '',
+            timestamp: comment.timestamp,
+            id: comment.id
+        });
+
+        // Mark this username as seen
+        userMap.set(username, true);
     });
+
+    console.log(`Final results: ${processed.length} unique users, ${duplicateCount} duplicates removed`);
 
     return {
         unique: processed,
         total: comments.length,
-        duplicates: comments.length - processed.length
+        duplicates: duplicateCount
     };
 }
 
