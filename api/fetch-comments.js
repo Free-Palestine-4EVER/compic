@@ -29,11 +29,10 @@ export default async function handler(req, res) {
 
         console.log('Fetching comments for URL:', url);
 
-        // Correct Apify API endpoint - run actor and wait for results
-        const actorId = 'apify/instagram-scraper';
-        const apifyUrl = `https://api.apify.com/v2/acts/${actorId}/run-sync-get-dataset-items?token=${apifyToken}`;
+        // Correct Apify API endpoint with tilde separator
+        const apifyUrl = `https://api.apify.com/v2/acts/apify~instagram-scraper/run-sync-get-dataset-items?token=${apifyToken}`;
 
-        console.log('Calling Apify endpoint:', apifyUrl.replace(apifyToken, '***'));
+        console.log('Calling Apify...');
 
         const response = await fetch(apifyUrl, {
             method: 'POST',
