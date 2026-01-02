@@ -42,7 +42,10 @@ export default async function handler(req, res) {
             body: JSON.stringify({
                 directUrls: [url],
                 resultsType: 'comments',
-                resultsLimit: 10000
+                resultsLimit: 999999,  // Get ALL comments
+                searchType: 'hashtag',
+                searchLimit: 1,
+                maxComments: 999999    // Also set maxComments to ensure we get everything
             }),
             timeout: 300000 // 5 minute timeout
         });
