@@ -1,4 +1,4 @@
-// ===== Instagram Comment Picker - Manual Input Version =====
+// ===== Instagram Comment Picker with URL Fetching =====
 let appState = {
     comments: [],
     uniqueParticipants: [],
@@ -6,8 +6,10 @@ let appState = {
 };
 
 const elements = {
+    instagramUrl: document.getElementById('instagramUrl'),
     commentsInput: document.getElementById('commentsInput'),
     winnerCount: document.getElementById('winnerCount'),
+    fetchBtn: document.getElementById('fetchBtn'),
     pickWinnerBtn: document.getElementById('pickWinnerBtn'),
     pickAgainBtn: document.getElementById('pickAgainBtn'),
     exportBtn: document.getElementById('exportBtn'),
@@ -46,6 +48,11 @@ function hideLoading() {
     elements.loadingOverlay.classList.remove('active');
 }
 
+function showError(message) {
+    hideLoading();
+    alert(`❌ ${message}`);
+}
+
 function getSecureRandomInt(max) {
     const array = new Uint32Array(1);
     crypto.getRandomValues(array);
@@ -77,46 +84,59 @@ function animateValue(element, start, end, duration) {
     }, 16);
 }
 
-// ===== PARSE COMMENTS =====
-function parseComments(text) {
-    const lines = text.trim().split('\n').filter(line => line.trim());
-    const parsed = [];
-    const userMap = new Map();
+// ===== FETCH INSTAGRAM COMMENTS =====
+async function fetchInstagramComments(url) {
+    try {
+        showLoading('Fetching comments from Instagram...', 'This may take a moment');
 
-    lines.forEach((line) => {
-        line = line.trim();
-        if (!line) return;
+        const response = await fetch('/api/fetch-comments', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ url })
+        });
 
-        let username = '';
-        let comment = '';
-
-        const colonIndex = line.indexOf(':');
-        if (colonIndex > 0 && colonIndex < 50) {
-            username = line.substring(0, colonIndex).trim();
-            comment = line.substring(colonIndex + 1).trim();
-        } else {
-            username = line.trim();
-            comment = '';
+        if (!response.ok) {
+            throw new Error('Failed to fetch comments');
         }
 
-        username = username.replace('@', '').trim();
-        const usernameLower = username.toLowerCase();
+        const data = await response.json();
 
-        if (username && !userMap.has(usernameLower)) {
-            parsed.push({
-                username: username,
-                text: comment,
-                id: parsed.length
+        if (!data.success) {
+            throw new Error(data.message || 'Failed to fetch comments');
+        }
+
+        return data.comments;
+
+    } catch (error) {
+        throw error;
+    }
+}
+
+// ===== PROCESS COMMENTS =====
+function processComments(comments) {
+    const userMap = new Map();
+    const processed = [];
+
+    comments.forEach((comment) => {
+        const username = comment.username.toLowerCase().replace('@', '').trim();
+
+        if (username && !userMap.has(username)) {
+            processed.push({
+                username: comment.username,
+                text: comment.text || '',
+                timestamp: comment.timestamp,
+                id: comment.id
             });
-            userMap.set(usernameLower, true);
+            userMap.set(username, true);
         }
     });
 
     return {
-        parsed: parsed,
-        totalLines: lines.length,
-        uniqueCount: parsed.length,
-        duplicatesCount: lines.length - parsed.length
+        unique: processed,
+        total: comments.length,
+        duplicates: comments.length - processed.length
     };
 }
 
@@ -164,7 +184,7 @@ function pickWinners(participants, count) {
     return shuffled.slice(0, count);
 }
 
-//===== DISPLAY WINNERS =====
+// ===== DISPLAY WINNERS =====
 function displayWinners(winners) {
     elements.winnersList.innerHTML = '';
 
@@ -192,7 +212,7 @@ function displayWinners(winners) {
 function displayParticipants(participants) {
     elements.participantsList.innerHTML = '';
 
-    participants.forEach((participant, index) => {
+    participants.forEach((participant) => {
         const item = document.createElement('div');
         item.className = 'participant-item';
         item.innerHTML = `<span class="participant-username">@${participant.username}</span>`;
@@ -250,58 +270,70 @@ function exportResults() {
     URL.revokeObjectURL(url);
 }
 
-// ===== MAIN FLOW =====
-async function handlePickWinner() {
-    const text = elements.commentsInput.value.trim();
+// ===== MAIN FLOW - URL FETCH =====
+async function handleFetchAndPick() {
+    const url = elements.instagramUrl.value.trim();
 
-    if (!text) {
-        alert('�� Please paste some comments first!');
+    if (!url) {
+        showError('Please enter an Instagram post URL');
+        return;
+    }
+
+    if (!url.includes('instagram.com')) {
+        showError('Please enter a valid Instagram URL');
         return;
     }
 
     try {
-        showLoading('Analyzing comments...', 'Removing duplicates');
-        await new Promise(resolve => setTimeout(resolve, 800));
+        const comments = await fetchInstagramComments(url);
 
-        const result = parseComments(text);
-
-        if (result.uniqueCount === 0) {
+        if (!comments || comments.length === 0) {
             hideLoading();
-            alert('❌ No valid comments found. Please check the format!');
+            showError('No comments found on this post');
             return;
         }
 
-        appState.comments = text.split('\n');
-        appState.uniqueParticipants = result.parsed;
+        appState.comments = comments;
 
-        // Update stats
-        updateStatistics(result.totalLines, result.uniqueCount, result.duplicatesCount);
-        displayParticipants(result.parsed);
+        showLoading('Processing comments...', 'Removing duplicates');
+        await new Promise(resolve => setTimeout(resolve, 500));
+
+        const processed = processComments(comments);
+        appState.uniqueParticipants = processed.unique;
+
+        if (processed.unique.length === 0) {
+            hideLoading();
+            showError('No valid participants found');
+            return;
+        }
+
+        updateStatistics(processed.total, processed.unique.length, processed.duplicates);
+        displayParticipants(processed.unique);
 
         elements.statsSection.style.display = 'block';
         elements.participantsSection.style.display = 'block';
 
-        // Pick winner
         showLoading('Selecting winner...', '🎲 Randomizing selection...');
         await new Promise(resolve => setTimeout(resolve, 1500));
 
         const count = parseInt(elements.winnerCount.value);
-        const winners = pickWinners(result.parsed, count);
+        const winners = pickWinners(processed.unique, count);
         appState.winners = winners;
 
         hideLoading();
 
-        // Show reveal
         showWinnerReveal(winners[0]);
 
-        // Display all winners
         displayWinners(winners);
         elements.winnersSection.style.display = 'block';
 
+        setTimeout(() => {
+            elements.statsSection.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }, 300);
+
     } catch (error) {
-        hideLoading();
         console.error('Error:', error);
-        alert('❌ An error occurred. Please try again!');
+        showError(error.message || 'Failed to fetch comments. The post may be private or Instagram blocked the request.');
     }
 }
 
@@ -320,7 +352,7 @@ function handlePickAgain() {
 }
 
 // ===== EVENT LISTENERS =====
-elements.pickWinnerBtn.addEventListener('click', handlePickWinner);
+elements.fetchBtn.addEventListener('click', handleFetchAndPick);
 elements.pickAgainBtn.addEventListener('click', handlePickAgain);
 elements.exportBtn.addEventListener('click', exportResults);
 elements.continueBtn.addEventListener('click', () => {
@@ -328,13 +360,13 @@ elements.continueBtn.addEventListener('click', () => {
     elements.winnersSection.scrollIntoView({ behavior: 'smooth' });
 });
 
-elements.commentsInput.addEventListener('keypress', (e) => {
-    if (e.key === 'Enter' && e.ctrlKey) {
-        handlePickWinner();
+elements.instagramUrl.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') {
+        handleFetchAndPick();
     }
 });
 
-// ===== INITIALIZATION =====
 console.log('✨ Instagram Comment Picker Ready!');
+console.log('🔗 URL Fetching: ENABLED');
 console.log('🛡️ Anti-Cheat: ON');
 console.log('🎲 Cryptographic Random: ON');

@@ -1,11 +1,9 @@
-// Instagram Comment Fetcher API
-// Note: Instagram's official API requires authentication and has strict rate limits
-// This endpoint uses public scraping as a fallback (for educational purposes)
+// Instagram Comment Scraper - Public Posts
+// Using Instagram's public JSON endpoints
 
 export default async function handler(req, res) {
-    // Enable CORS
     res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
     if (req.method === 'OPTIONS') {
@@ -29,116 +27,118 @@ export default async function handler(req, res) {
 
         if (!shortcodeMatch) {
             return res.status(400).json({
-                error: 'Invalid Instagram URL. Please use a post or reel URL (e.g., https://www.instagram.com/p/ABC123/)'
+                error: 'Invalid Instagram URL'
             });
         }
 
         const shortcode = shortcodeMatch[1];
 
-        // Method 1: Try to fetch via Instagram's GraphQL endpoint (may be blocked)
-        // This is for demonstration - in production, you'd need proper authentication
+        // Method 1: Try Instagram's public GraphQL endpoint
+        const graphqlUrl = `https://www.instagram.com/graphql/query/?query_hash=f0986789a5c5d17c2400faebf16efd0d&variables=${encodeURIComponent(JSON.stringify({
+            shortcode: shortcode,
+            first: 100
+        }))}`;
 
-        const response = await fetch(`https://www.instagram.com/p/${shortcode}/?__a=1&__d=dis`, {
-            headers: {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-                'Accept': 'application/json',
-                'Accept-Language': 'en-US,en;q=0.9',
-                'X-Requested-With': 'XMLHttpRequest'
-            }
-        });
+        const headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept': '*/*',
+            'Accept-Language': 'en-US,en;q=0.9',
+            'Referer': 'https://www.instagram.com/',
+            'X-IG-App-ID': '936619743392459',
+            'X-Requested-With': 'XMLHttpRequest'
+        };
 
+        let response = await fetch(graphqlUrl, { headers });
+
+        // Method 2: Try the embed endpoint
         if (!response.ok) {
-            // If Instagram blocks us, return demo data for testing
-            console.log('Instagram API blocked, using demo mode');
-            return res.status(200).json({
-                success: true,
-                demoMode: true,
-                message: 'Instagram API is currently unavailable. Using demo data for testing.',
-                comments: generateDemoComments(),
-                postInfo: {
-                    shortcode: shortcode,
-                    owner: 'demo_user',
-                    caption: 'This is a demo post for testing purposes'
-                }
-            });
+            const embedUrl = `https://www.instagram.com/p/${shortcode}/embed/captioned/`;
+            response = await fetch(embedUrl, { headers });
+
+            if (!response.ok) {
+                // Method 3: Try standard page with __a=1
+                const standardUrl = `https://www.instagram.com/p/${shortcode}/?__a=1&__d=dis`;
+                response = await fetch(standardUrl, { headers });
+            }
         }
 
-        const data = await response.json();
+        if (!response.ok) {
+            throw new Error('Instagram blocked the request');
+        }
 
-        // Parse Instagram data structure
-        const comments = parseInstagramComments(data);
+        const contentType = response.headers.get('content-type');
+        let data;
+
+        if (contentType && contentType.includes('application/json')) {
+            data = await response.json();
+        } else {
+            // Parse HTML for embedded JSON
+            const html = await response.text();
+            const jsonMatch = html.match(/window\._sharedData = ({.+?});<\/script>/);
+            if (jsonMatch) {
+                data = JSON.parse(jsonMatch[1]);
+            } else {
+                throw new Error('Could not extract data from Instagram');
+            }
+        }
+
+        // Extract comments from the data structure
+        const comments = extractComments(data);
 
         return res.status(200).json({
             success: true,
-            demoMode: false,
             comments: comments,
-            postInfo: {
-                shortcode: shortcode,
-                owner: data.graphql?.shortcode_media?.owner?.username || 'unknown',
-                caption: data.graphql?.shortcode_media?.edge_media_to_caption?.edges[0]?.node?.text || ''
-            }
+            total: comments.length,
+            shortcode: shortcode
         });
 
     } catch (error) {
-        console.error('Error fetching comments:', error);
+        console.error('Scraping error:', error);
 
-        // Return demo data on error for testing
         return res.status(200).json({
-            success: true,
-            demoMode: true,
-            message: 'Could not fetch real comments. Using demo data for testing.',
-            comments: generateDemoComments(),
-            postInfo: {
-                shortcode: 'demo',
-                owner: 'demo_user',
-                caption: 'Demo post for testing'
-            }
+            success: false,
+            error: error.message,
+            message: 'Unable to fetch comments. The post may be private or Instagram is blocking requests.'
         });
     }
 }
 
-function parseInstagramComments(data) {
+function extractComments(data) {
     const comments = [];
 
     try {
-        const edges = data.graphql?.shortcode_media?.edge_media_to_parent_comment?.edges || [];
+        // Try different data structures Instagram uses
+        let commentData = null;
 
-        for (const edge of edges) {
-            const comment = edge.node;
-            comments.push({
-                username: comment.owner?.username || 'unknown',
-                text: comment.text || '',
-                timestamp: comment.created_at || Date.now(),
-                id: comment.id || Math.random().toString()
+        // Structure 1: GraphQL response
+        if (data.data?.shortcode_media?.edge_media_to_parent_comment) {
+            commentData = data.data.shortcode_media.edge_media_to_parent_comment.edges;
+        }
+        // Structure 2: Page data
+        else if (data.entry_data?.PostPage?.[0]?.graphql?.shortcode_media?.edge_media_to_parent_comment) {
+            commentData = data.entry_data.PostPage[0].graphql.shortcode_media.edge_media_to_parent_comment.edges;
+        }
+        // Structure 3: Media data
+        else if (data.graphql?.shortcode_media?.edge_media_to_parent_comment) {
+            commentData = data.graphql.shortcode_media.edge_media_to_parent_comment.edges;
+        }
+
+        if (commentData && Array.isArray(commentData)) {
+            commentData.forEach(edge => {
+                const node = edge.node;
+                if (node && node.owner) {
+                    comments.push({
+                        username: node.owner.username,
+                        text: node.text || '',
+                        timestamp: node.created_at || Date.now(),
+                        id: node.id || Math.random().toString()
+                    });
+                }
             });
         }
     } catch (error) {
-        console.error('Error parsing comments:', error);
+        console.error('Error extracting comments:', error);
     }
 
     return comments;
-}
-
-function generateDemoComments() {
-    // Generate realistic demo data for testing
-    const demoUsers = [
-        'john_doe', 'jane_smith', 'mike_jones', 'sara_wilson', 'alex_kim',
-        'chris_lee', 'emma_brown', 'david_miller', 'sophia_garcia', 'ryan_davis',
-        'olivia_martinez', 'james_taylor', 'ava_anderson', 'william_thomas', 'isabella_moore',
-        'JOHN_DOE', 'Jane_Smith', 'MIKE_JONES' // Duplicates for testing
-    ];
-
-    const demoComments = [
-        'This is amazing! 🎉', 'I love this! ❤️', 'Count me in!', 'This looks great!',
-        'Amazing work! 👏', 'Can\'t wait! 🔥', 'Let\'s go! 💪', 'So cool!',
-        'This is awesome! ⭐', 'Great post! 🎊', 'Incredible! 🌟', 'Love it! 💯',
-        'Perfect! ✨', 'Fantastic! 🎈', 'Awesome! 🚀'
-    ];
-
-    return demoUsers.map((username, index) => ({
-        username: username,
-        text: demoComments[index % demoComments.length],
-        timestamp: Date.now() - (index * 60000),
-        id: `demo_${index}`
-    }));
 }
