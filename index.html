@@ -78,38 +78,27 @@
         <div class="main-content">
             <!-- Input Section -->
             <section class="input-section">
-                <h2>📝 Paste Instagram Comments</h2>
-                <p class="section-desc">Copy comments from your Instagram post and paste them below</p>
+                <h2>🔗 Paste Instagram Post URL</h2>
+                <p class="section-desc">Enter any public Instagram post or reel URL - we'll fetch all comments
+                    automatically!</p>
 
-                <div class="how-to-card">
-                    <strong>📱 How to get comments:</strong>
-                    <ol>
-                        <li>Open your Instagram post in a browser or app</li>
-                        <li>Copy each comment (username + text)</li>
-                        <li>Paste below - one comment per line</li>
-                    </ol>
+                <div style="margin-bottom: 1.5rem;">
+                    <input type="text" id="instagramUrl" placeholder="https://www.instagram.com/p/ABC123xyz/"
+                        autocomplete="off"
+                        style="width: 100%; padding: 1rem; background: var(--bg-light); border: 2px solid var(--border); border-radius: var(--radius); font-size: 1rem; font-family: 'Poppins', sans-serif; color: var(--text-dark);">
                 </div>
-
-                <textarea id="commentsInput" placeholder="Paste comments here (one per line):
-
-john_doe: This is amazing! 🎉
-jane_smith: I love this! ❤️
-mike_jones: Count me in!
-
-Format: username: comment
-OR just: username" rows="14"></textarea>
 
                 <div class="controls-row">
                     <div class="winner-count-control">
                         <label>Number of Winners:</label>
                         <input type="number" id="winnerCount" value="1" min="1" max="10">
                     </div>
-                    <button id="pickWinnerBtn" class="btn btn-primary">
+                    <button id="fetchBtn" class="btn btn-primary">
                         <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
                             <path d="M10 2L12.5 7.5L18 8.5L14 12.5L15 18L10 15.5L5 18L6 12.5L2 8.5L7.5 7.5L10 2Z"
                                 fill="currentColor" />
                         </svg>
-                        Pick Winner
+                        Fetch & Pick Winner
                     </button>
                 </div>
             </section>
