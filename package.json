@@ -1,0 +1,22 @@
+{
+  "name": "instagram-comment-picker",
+  "version": "2.0.0",
+  "description": "Professional Instagram comment picker with URL fetching and anti-cheat protection",
+  "main": "index.html",
+  "scripts": {
+    "dev": "vercel dev",
+    "build": "echo 'Static site - no build needed'",
+    "start": "python -m http.server 8000"
+  },
+  "keywords": [
+    "instagram",
+    "comment-picker",
+    "giveaway",
+    "random-picker"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "axios": "^1.6.0"
+  }
+}
