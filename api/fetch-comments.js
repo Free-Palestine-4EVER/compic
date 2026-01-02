@@ -1,6 +1,5 @@
-// Instagram Comment Fetcher - Simplified with Better Error Handling
+// Instagram Comment Fetcher - Using Correct Apify Actor
 export default async function handler(req, res) {
-    // CORS headers
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
@@ -20,34 +19,32 @@ export default async function handler(req, res) {
             return res.status(400).json({ error: 'Instagram URL is required' });
         }
 
-        // Check for API token
         const apifyToken = process.env.APIFY_API_TOKEN;
-        console.log('Token exists:', !!apifyToken);
-        console.log('Token length:', apifyToken?.length);
 
         if (!apifyToken) {
             return res.status(500).json({
                 error: 'APIFY_API_TOKEN not set',
-                message: 'Please add APIFY_API_TOKEN to your Vercel environment variables',
-                envVars: Object.keys(process.env).filter(k => k.includes('APIFY'))
+                message: 'Please add APIFY_API_TOKEN to your Vercel environment variables'
             });
         }
 
         console.log('Fetching comments for URL:', url);
 
-        // Use the simpler sync endpoint
-        const apifyUrl = 'https://api.apify.com/v2/acts/zuzka~instagram-comments-scraper/run-sync-get-dataset-items';
+        // Use the correct Apify Instagram Scraper actor
+        // This is the official Apify actor that works
+        const apifyUrl = 'https://api.apify.com/v2/acts/apify~instagram-scraper/run-sync-get-dataset-items';
 
-        console.log('Calling Apify...');
-
-        const response = await fetch(`${apifyUrl}?token=${apifyToken}&timeout=120`, {
+        const response = await fetch(`${apifyUrl}?token=${apifyToken}&timeout=180`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({
                 directUrls: [url],
-                resultsLimit: 10000
+                resultsType: 'comments',  // Important: get comments only
+                resultsLimit: 10000,
+                searchType: 'hashtag',
+                searchLimit: 1
             })
         });
 
@@ -55,36 +52,40 @@ export default async function handler(req, res) {
 
         if (!response.ok) {
             const errorText = await response.text();
-            console.error('Apify error response:', errorText);
+            console.error('Apify error:', errorText);
 
             return res.status(500).json({
                 success: false,
-                error: `Apify returned ${response.status}`,
-                details: errorText.substring(0, 500),
-                message: 'Failed to scrape Instagram. The post may be private or your Apify token may be invalid.'
+                error: `Apify error: ${response.status}`,
+                details: errorText.substring(0, 300),
+                message: 'Failed to fetch comments. Please check the Instagram URL or try again.'
             });
         }
 
         const data = await response.json();
         console.log('Apify returned', data.length, 'items');
 
-        // Parse comments
+        // Parse comments from Apify response
         const comments = [];
 
         if (Array.isArray(data)) {
             data.forEach((item, index) => {
-                if (item.ownerUsername) {
+                // Apify returns different structures, handle both
+                const username = item.ownerUsername || item.owner?.username || `user_${index}`;
+                const text = item.text || item.comment || '';
+
+                if (username) {
                     comments.push({
-                        username: item.ownerUsername,
-                        text: item.text || '',
-                        timestamp: item.timestamp || Date.now(),
+                        username: username,
+                        text: text,
+                        timestamp: item.timestamp || item.created_time || Date.now(),
                         id: item.id || index.toString()
                     });
                 }
             });
         }
 
-        console.log('Parsed', comments.length, 'comments');
+        console.log('Successfully parsed', comments.length, 'comments');
 
         return res.status(200).json({
             success: true,
@@ -99,8 +100,7 @@ export default async function handler(req, res) {
         return res.status(500).json({
             success: false,
             error: error.message,
-            stack: error.stack?.substring(0, 500),
-            message: 'An error occurred while fetching comments'
+            message: 'An error occurred while fetching comments. Please try again.'
         });
     }
 }
