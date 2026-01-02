@@ -1,4 +1,4 @@
-// Instagram Comment Fetcher - Correct Apify API Endpoint
+// Instagram Comment Fetcher - Using Apify Async Endpoint
 export default async function handler(req, res) {
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
@@ -29,12 +29,12 @@ export default async function handler(req, res) {
 
         console.log('Fetching comments for URL:', url);
 
-        // Correct Apify API endpoint with tilde separator
-        const apifyUrl = `https://api.apify.com/v2/acts/apify~instagram-scraper/run-sync-get-dataset-items?token=${apifyToken}`;
+        // Step 1: Start the actor run (async)
+        const startUrl = `https://api.apify.com/v2/acts/apify~instagram-scraper/runs?token=${apifyToken}`;
 
-        console.log('Calling Apify...');
+        console.log('Starting Apify actor run...');
 
-        const response = await fetch(apifyUrl, {
+        const startResponse = await fetch(startUrl, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
@@ -45,26 +45,56 @@ export default async function handler(req, res) {
                 resultsLimit: 10000,
                 searchType: 'hashtag',
                 addParentData: false
-            }),
-            timeout: 300000 // 5 minute timeout
+            })
         });
 
-        console.log('Apify response status:', response.status);
-
-        if (!response.ok) {
-            const errorText = await response.text();
-            console.error('Apify error:', errorText);
-
-            return res.status(500).json({
-                success: false,
-                error: `Apify returned ${response.status}`,
-                details: errorText.substring(0, 500),
-                message: 'Failed to fetch comments from Instagram'
-            });
+        if (!startResponse.ok) {
+            const errorText = await startResponse.text();
+            console.error('Failed to start Apify run:', errorText);
+            throw new Error(`Failed to start scraper: ${startResponse.status}`);
         }
 
-        const data = await response.json();
-        console.log('Apify returned data, length:', Array.isArray(data) ? data.length : 'not an array');
+        const runData = await startResponse.json();
+        const runId = runData.data.id;
+        const defaultDatasetId = runData.data.defaultDatasetId;
+
+        console.log('Run started:', runId, 'Dataset:', defaultDatasetId);
+
+        // Step 2: Poll for completion
+        let attempts = 0;
+        let status = 'RUNNING';
+        const maxAttempts = 60; // 2 minutes max (2 sec intervals)
+
+        while (status === 'RUNNING' && attempts < maxAttempts) {
+            await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2 seconds
+
+            const statusUrl = `https://api.apify.com/v2/actor-runs/${runId}?token=${apifyToken}`;
+            const statusResponse = await fetch(statusUrl);
+            const statusData = await statusResponse.json();
+            status = statusData.data.status;
+
+            attempts++;
+            console.log(`Poll ${attempts}: Status = ${status}`);
+        }
+
+        if (status !== 'SUCCEEDED') {
+            throw new Error(`Scraper run failed with status: ${status}`);
+        }
+
+        console.log('Run completed successfully!');
+
+        // Step 3: Get the full dataset
+        const datasetUrl = `https://api.apify.com/v2/datasets/${defaultDatasetId}/items?token=${apifyToken}`;
+        console.log('Fetching dataset...');
+
+        const datasetResponse = await fetch(datasetUrl);
+
+        if (!datasetResponse.ok) {
+            throw new Error('Failed to fetch dataset');
+        }
+
+        const data = await datasetResponse.json();
+        console.log('Dataset fetched, total items:', data.length);
 
         // Parse comments
         const comments = [];
